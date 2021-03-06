@@ -43,6 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.action = #selector(buttonAction(_:))
         statusItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+        statusItem?.button?.title = "MPD: connection refused"
         // XXX: Image is not really aligned with the text.
         //statusItem?.button?.imagePosition = .imageLeading
         

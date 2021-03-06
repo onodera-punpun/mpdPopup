@@ -21,6 +21,7 @@ struct PopoverView: View {
         ZStack {
             Cover()
             Toggle()
+            Wrench()
         }
         .mask(
             RadialGradient(
@@ -38,6 +39,9 @@ struct PopoverView: View {
         .onPreferenceChange(HeightPreferenceKey.self) { v in
             height = v
         }
+        .onTapGesture() {
+            
+        }
     }
 }
 
@@ -54,15 +58,23 @@ struct Cover: View {
             .background(
                 GeometryReader { v in
                     Color.clear
-                        .preference(key: HeightPreferenceKey.self, value: v.size.height)
+                        .preference(
+                            key:   HeightPreferenceKey.self,
+                            value: v.size.height
+                        )
                 }
             )
     }
 
     // TODO: This will always, even when the popover is closed, load an image.
-    func getCover(uri: String) -> NSImage {
+    func getCover(uri: String?) -> NSImage {
+        guard uri != nil else {
+            // TODO: Fallback image.
+            return NSImage()
+        }
+        
         let basename = URL(fileURLWithPath: directory)
-            .appendingPathComponent(uri)
+            .appendingPathComponent(uri!)
             .deletingLastPathComponent()
 
         for location in [
@@ -74,8 +86,52 @@ struct Cover: View {
             }
         }
 
-        // TODO: Fallback image
-        return NSImage(byReferencing: basename.appendingPathComponent("cover.jpg"))
+        // TODO: Fallback image.
+        return NSImage()
+    }
+}
+
+struct Wrench: View {
+    @Environment(\.openURL) var openURL
+
+    @State private var hover = false
+
+    var body: some View {
+        Image(systemName: "wrench.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 16)
+            .foregroundColor(.white)
+            .background(
+                VisualEffectBlur(
+                    material: .hudWindow,
+                    blendingMode: .withinWindow,
+                    state: .active
+                )
+                .frame(width: 40, height: 40)
+                .shadow(
+                    color: Color.black.opacity(0.2),
+                    radius: 20
+                )
+                .cornerRadius(100)
+                .onHover() { v in
+                    hover = v
+                }
+            )
+            .opacity(1)
+            .scaleEffect(hover ? 1.2 : 1)
+            .animation(.easeInOut)
+            .offset(x: 90, y: -90)
+            .onTapGesture() {
+                hover = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    hover = true
+                }
+                
+                if let url = URL(string: "mpdPopup://settings") {
+                    openURL(url)
+                }
+            }
     }
 }
 
@@ -85,7 +141,7 @@ struct Toggle: View {
     @State private var visible = false
 
     var body: some View {
-        Image(systemName: status.state + ".circle")
+        Image(systemName: (status.state ?? "questionmark") + ".circle")
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: 35)
@@ -106,7 +162,7 @@ struct Toggle: View {
             .opacity(visible ? 1 : 0)
             .scaleEffect(visible ? 1 : 0.9)
             .animation(.easeInOut)
-            .onReceive(status.$state, perform: { v in
+            .onReceive(status.$state) { v in
                 if v == "pause" {
                     visible = true
                     return
@@ -118,7 +174,6 @@ struct Toggle: View {
                     }
                     visible = false
                 }
-            })
+            }
     }
 }
-

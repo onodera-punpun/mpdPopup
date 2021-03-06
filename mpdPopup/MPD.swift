@@ -18,7 +18,7 @@ class MPD {
     private var conn: OpaquePointer?
     
     init(statusItem: NSStatusItem, popover: NSPopover) {
-        self.conn = mpd_connection_new(self.host, UInt32(self.port), 10000)
+        self.conn = mpd_connection_new(self.host, UInt32(self.port), 30000)
         
         self.song.conn = self.conn
         self.status.conn = self.conn
@@ -42,9 +42,10 @@ class MPD {
                     
                     // XXX: Image is not really aligned with the text.
                     //statusItem.button?.image = NSImage(systemSymbolName: self.status.state, accessibilityDescription: self.status.state)
-                    statusItem.button?.title = "\(self.song.artist) - \(self.song.title)"
+                    statusItem.button?.title = "\(self.song.artist ?? "?") - \(self.song.title ?? "?")"
                 }
                 
+                // This blocks the loop.
                 if mpd_run_idle_mask(self.conn, MPD_IDLE_PLAYER) == mpd_idle(0) {
                     continue
                 }
@@ -53,6 +54,7 @@ class MPD {
     }
 
     func command(_ name: String) {
+        // XXX: Not sure why this is needed, but using the existing `conn` breaks the idle loop.
         let tmp = mpd_connection_new(host, UInt32(port), 1000)
         if mpd_connection_get_error(tmp) != MPD_ERROR_SUCCESS {
             return
@@ -75,11 +77,10 @@ class MPD {
 class Song: ObservableObject {
     var conn: OpaquePointer?
 
-    // TODO: I maybe should allow nil here instead of setting meaningless default values.
-    @Published var location: String = "."
-    @Published var artist: String = "?"
-    @Published var title: String = "?"
-    @Published var duration: UInt32 = 0
+    @Published var location: String?
+    @Published var artist: String?
+    @Published var title: String?
+    @Published var duration: UInt32?
     
     func set() {
         if let recvSong = mpd_run_current_song(conn) {
@@ -91,14 +92,14 @@ class Song: ObservableObject {
                 location = newLocation
             }
             
-            let newArtist = String(cString: mpd_song_get_tag(recvSong, MPD_TAG_ARTIST, 0))
-            if artist != newArtist {
-                artist = newArtist
+            let newArtist = mpd_song_get_tag(recvSong, MPD_TAG_ARTIST, 0)
+            if newArtist != nil && artist != String(cString: newArtist!) {
+                artist = String(cString: newArtist!)
             }
             
-            let newTitle = String(cString: mpd_song_get_tag(recvSong, MPD_TAG_TITLE, 0))
-            if title != newTitle {
-                title = newTitle
+            let newTitle = mpd_song_get_tag(recvSong, MPD_TAG_TITLE, 0)
+            if newTitle != nil && title != String(cString: newTitle!) {
+                title = String(cString: newTitle!)
             }
             
             let newDuration = mpd_song_get_duration(recvSong)
@@ -114,9 +115,8 @@ class Song: ObservableObject {
 class Status: ObservableObject {
     var conn: OpaquePointer?
 
-    // TODO: I maybe should allow nil here instead of setting meaningless default values.
-    @Published var state: String = "?"
-    @Published var elapsed: UInt32 = 0
+    @Published var state: String?
+    @Published var elapsed: UInt32?
     
     func set() {
         if let recvStatus = mpd_run_status(conn) {
